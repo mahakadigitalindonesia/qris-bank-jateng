@@ -25,10 +25,10 @@ class QrisServiceImpl implements QrisService
         $this->apiKey = $apiKey;
     }
 
-    public function getLink($idBilling) : QrisLink
+    public function getLink($idBilling): QrisLink
     {
         try {
-            if (!Cache::has('qris_token')) {
+            if (!Cache::has('qris_token_' . $idBilling)) {
                 $token = $this->http()->post(self::URL_GET_TOKEN, [
                     'key' => $this->apiKey,
                     'idBilling' => $idBilling
@@ -51,6 +51,10 @@ class QrisServiceImpl implements QrisService
                     return QrisLink::create('token tidak valid');
                 }
                 Cache::put('qris_token_' . $idBilling, $token->json('token'), now()->addMinutes(4));
+            }
+
+            if (Cache::has('qris_link_' . $idBilling)) {
+                return QrisLink::create('00', Cache::get('qris_link_' . $idBilling));
             }
 
             $link = $this->http()->post(self::URL_GET_LINK, [
@@ -76,7 +80,7 @@ class QrisServiceImpl implements QrisService
             if ($this->isJson((string)$link->json('data'))) {
                 return QrisLink::create('88');
             }
-
+            Cache::put('qris_link_' . $idBilling, (string)$link->json('data'), now()->addHours(1));
             return QrisLink::create('00', (string)$link->json('data'));
         } catch (\Exception $e) {
             return QrisLink::create('99');
@@ -113,6 +117,4 @@ class QrisServiceImpl implements QrisService
         return Http::baseUrl($this->baseURL)
             ->withBasicAuth($this->username, $this->password);
     }
-
-
 }
